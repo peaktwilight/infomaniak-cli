@@ -235,6 +235,7 @@ def cmd_setup(args):
             print()
 
     print("  You need an API token with these scopes:\n")
+    print(f"    {cyan('•')} accounts")
     print(f"    {cyan('•')} domain:read")
     print(f"    {cyan('•')} dns:read")
     print(f"    {cyan('•')} dns:write\n")

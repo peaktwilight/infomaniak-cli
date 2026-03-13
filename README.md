@@ -43,7 +43,7 @@ The setup wizard will:
 3. Validate it against the API
 4. Save it to `~/.config/infomaniak/config.ini`
 
-You'll need a token with these scopes: `domain:read`, `dns:read`, `dns:write`.
+You'll need a token with these scopes: `accounts`, `domain:read`, `dns:read`, `dns:write`.
 
 ### Alternative configuration
 
@@ -116,7 +116,7 @@ $ infomaniak dns records example.com --type A
 
 ## Why not OAuth?
 
-Infomaniak's OAuth2 apps only support `openid`, `profile`, `email`, and `phone` scopes. The DNS management scopes (`domain:read`, `dns:read`, `dns:write`) are only available through API tokens — so there's no way to implement a browser-based login flow.
+Infomaniak's OAuth2 apps only support `openid`, `profile`, `email`, and `phone` scopes. The DNS management scopes (`accounts`, `domain:read`, `dns:read`, `dns:write`) are only available through API tokens — so there's no way to implement a browser-based login flow.
 
 ## API reference
 
