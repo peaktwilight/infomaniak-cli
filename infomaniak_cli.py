@@ -33,7 +33,7 @@ except ImportError:
     sys.exit(1)
 
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 API_BASE = "https://api.infomaniak.com"
 CONFIG_DIR = Path.home() / ".config" / "infomaniak"
 CONFIG_FILE = CONFIG_DIR / "config.ini"
