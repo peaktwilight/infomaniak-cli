@@ -1,5 +1,9 @@
 # infomaniak
 
+[![PyPI version](https://img.shields.io/pypi/v/infomaniak)](https://pypi.org/project/infomaniak/)
+[![Python versions](https://img.shields.io/pypi/pyversions/infomaniak)](https://pypi.org/project/infomaniak/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 CLI tool for managing your [Infomaniak](https://www.infomaniak.com) services from the terminal.
 
 Currently supports **DNS management** — more services planned.
@@ -26,31 +30,34 @@ cd infomaniak-cli
 pip install .
 ```
 
-## Configuration
-
-### 1. Get an API token
-
-1. Go to [Infomaniak API tokens](https://manager.infomaniak.com/v3/infomaniak-api)
-2. Create a new token with these scopes:
-   - `domain:read`
-   - `dns:read`
-   - `dns:write`
-3. Copy the token
-
-### 2. Set the token
-
-**Option A** — environment variable:
+## Getting started
 
 ```bash
+infomaniak setup
+```
+
+The setup wizard will:
+
+1. Open the Infomaniak token page in your browser
+2. Prompt you to paste your API token
+3. Validate it against the API
+4. Save it to `~/.config/infomaniak/config.ini`
+
+You'll need a token with these scopes: `domain:read`, `dns:read`, `dns:write`.
+
+### Alternative configuration
+
+You can also set the token manually:
+
+```bash
+# Environment variable
 export INFOMANIAK_API_TOKEN=your-token-here
-```
 
-**Option B** — `.env` file:
-
-```bash
+# Or .env file
 cp .env.example .env
-# Edit .env and paste your token
 ```
+
+Token lookup order: environment variable → config file → `.env` file.
 
 ## Usage
 
@@ -90,7 +97,7 @@ infomaniak --version
 ```
 $ infomaniak dns domains
 
-Domains (2):
+  Domains (2)
 
   ID       Domain           DNSSEC  DNS@IK
   ───────  ───────────────  ──────  ──────
@@ -99,7 +106,7 @@ Domains (2):
 
 $ infomaniak dns records example.com --type A
 
-DNS records for example.com (type=A) — 2 records:
+  DNS records for example.com — 2 records
 
   ID      Type  Name  Target          TTL
   ──────  ────  ────  ──────────────  ────

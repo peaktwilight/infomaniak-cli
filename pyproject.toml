@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "infomaniak"
-version = "0.2.0"
+version = "0.3.0"
 description = "CLI tool for managing Infomaniak services — DNS records, domains, and more."
 readme = "README.md"
 license = "MIT"
