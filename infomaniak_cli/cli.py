@@ -4,6 +4,7 @@ import argparse
 import sys
 
 from infomaniak_cli import __version__
+from infomaniak_cli.commands.account import cmd_account
 from infomaniak_cli.commands.config import cmd_config_show
 from infomaniak_cli.commands.dns import (
     cmd_dns_add,
@@ -20,7 +21,9 @@ from infomaniak_cli.commands.dns import (
     cmd_dns_sync,
     cmd_dns_update,
 )
-from infomaniak_cli.commands.mail import cmd_mail_list
+from infomaniak_cli.commands.drive import cmd_drive_list
+from infomaniak_cli.commands.hosting import cmd_hosting_list
+from infomaniak_cli.commands.mail import cmd_mail_list, cmd_mail_mailboxes
 from infomaniak_cli.commands.products import cmd_products
 from infomaniak_cli.commands.setup import cmd_setup
 from infomaniak_cli.commands.status import cmd_status
@@ -146,11 +149,32 @@ def main():
     sp = config_sub.add_parser("show", help="Show current configuration")
     sp.set_defaults(func=cmd_config_show)
 
+    # ── account ────────────────────────────────────────────────────────────
+    sp_account = subparsers.add_parser("account", help="Show account overview")
+    sp_account.add_argument("--json", action="store_true", help="Output as JSON")
+    sp_account.set_defaults(func=cmd_account)
+
     # ── products ───────────────────────────────────────────────────────────
     sp_products = subparsers.add_parser("products", help="List all products on your account")
     sp_products.add_argument("--type", "-t", dest="service_filter", help="Filter by service type (e.g. domain, email_hosting)")
     sp_products.add_argument("--json", action="store_true", help="Output as JSON")
     sp_products.set_defaults(func=cmd_products)
+
+    # ── hosting ────────────────────────────────────────────────────────────
+    hosting_parser = subparsers.add_parser("hosting", help="Manage web hosting services")
+    hosting_sub = hosting_parser.add_subparsers(dest="command")
+
+    sp = hosting_sub.add_parser("list", help="List web hosting services")
+    sp.add_argument("--json", action="store_true", help="Output as JSON")
+    sp.set_defaults(func=cmd_hosting_list)
+
+    # ── drive ──────────────────────────────────────────────────────────────
+    drive_parser = subparsers.add_parser("drive", help="Manage kDrive instances")
+    drive_sub = drive_parser.add_subparsers(dest="command")
+
+    sp = drive_sub.add_parser("list", help="List kDrive instances")
+    sp.add_argument("--json", action="store_true", help="Output as JSON")
+    sp.set_defaults(func=cmd_drive_list)
 
     # ── mail ───────────────────────────────────────────────────────────────
     mail_parser = subparsers.add_parser("mail", help="Manage mail services")
@@ -159,6 +183,11 @@ def main():
     sp = mail_sub.add_parser("list", help="List mail hosting services")
     sp.add_argument("--json", action="store_true", help="Output as JSON")
     sp.set_defaults(func=cmd_mail_list)
+
+    sp = mail_sub.add_parser("mailboxes", help="List mailboxes (requires 'mail' scope)")
+    sp.add_argument("mail_hosting_id", help="Mail hosting ID (from 'infomaniak mail list')")
+    sp.add_argument("--json", action="store_true", help="Output as JSON")
+    sp.set_defaults(func=cmd_mail_mailboxes)
 
     # ── status ─────────────────────────────────────────────────────────────
     sp_status = subparsers.add_parser("status", help="Service status overview")
@@ -173,6 +202,14 @@ def main():
 
     if args.service == "dns" and not getattr(args, "command", None):
         dns_parser.print_help()
+        sys.exit(1)
+
+    if args.service == "hosting" and not getattr(args, "command", None):
+        hosting_parser.print_help()
+        sys.exit(1)
+
+    if args.service == "drive" and not getattr(args, "command", None):
+        drive_parser.print_help()
         sys.exit(1)
 
     if args.service == "mail" and not getattr(args, "command", None):

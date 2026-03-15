@@ -114,6 +114,13 @@ infomaniak dns sync example.com desired-state.json --dry-run
 infomaniak dns sync example.com desired-state.json --yes
 ```
 
+### Account
+
+```bash
+# Show account overview with product summary
+infomaniak account
+```
+
 ### Products
 
 ```bash
@@ -125,11 +132,28 @@ infomaniak products --type domain
 infomaniak products --type email_hosting
 ```
 
+### Hosting
+
+```bash
+# List web hosting services
+infomaniak hosting list
+```
+
+### kDrive
+
+```bash
+# List kDrive instances
+infomaniak drive list
+```
+
 ### Mail
 
 ```bash
 # List all mail hosting services
 infomaniak mail list
+
+# List mailboxes (requires 'mail' scope on your token)
+infomaniak mail mailboxes <mail_hosting_id>
 ```
 
 ### Status
@@ -155,6 +179,7 @@ infomaniak dns domains --json
 infomaniak dns records example.com --json
 infomaniak dns diff example.com records.json --json
 infomaniak products --json
+infomaniak account --json
 infomaniak status --json
 ```
 
