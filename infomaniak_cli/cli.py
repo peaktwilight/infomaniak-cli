@@ -80,6 +80,7 @@ def main():
     sp.add_argument("source", help="Record name (e.g. 'www', 'api', '@' for root)")
     sp.add_argument("target", help="Record value (e.g. IP address, hostname)")
     sp.add_argument("--ttl", type=int, default=3600, help="TTL in seconds (default: 3600)")
+    sp.add_argument("--dry-run", action="store_true", help="Show what would be created without applying it")
     sp.add_argument("--json", action="store_true", help="Output as JSON")
     sp.set_defaults(func=cmd_dns_add)
 
@@ -89,6 +90,7 @@ def main():
     sp.add_argument("record_id", help="Record ID to update")
     sp.add_argument("--target", help="New target value")
     sp.add_argument("--ttl", type=int, help="New TTL in seconds")
+    sp.add_argument("--dry-run", action="store_true", help="Show the change without applying it")
     sp.set_defaults(func=cmd_dns_update)
 
     # dns delete
@@ -96,6 +98,7 @@ def main():
     sp.add_argument("domain", help="Domain name")
     sp.add_argument("record_id", help="Record ID to delete")
     sp.add_argument("--yes", "-y", action="store_true", help="Skip confirmation")
+    sp.add_argument("--dry-run", action="store_true", help="Show the record without deleting it")
     sp.set_defaults(func=cmd_dns_delete)
 
     # dns export

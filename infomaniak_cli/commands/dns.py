@@ -3,6 +3,7 @@
 import csv
 import io
 import json
+import shlex
 import sys
 from pathlib import Path
 
@@ -101,6 +102,23 @@ def cmd_dns_check(args):
     print()
 
 
+def _find_record(token, domain, record_id):
+    """Return the live record with this ID, or exit if the zone has none."""
+    data = api_request("GET", f"/2/zones/{domain}/records", token)
+    for r in data.get("data", []):
+        if str(r.get("id")) == str(record_id):
+            return r
+    print(f"  {red('✗')} Record {record_id} not found in {domain}. List IDs with: infomaniak dns records {domain}")
+    sys.exit(1)
+
+
+def _describe(r):
+    source = r.get("source") or "@"
+    if source == ".":
+        source = "@"
+    return f"{cyan(r.get('type'))} {source} → {r.get('target')}"
+
+
 def cmd_dns_add(args):
     """Create a new DNS record."""
     token = get_token()
@@ -117,7 +135,11 @@ def cmd_dns_add(args):
     }
 
     display_name = args.source if args.source != "@" else args.domain
-    print(f"\n  Creating {cyan(body['type'])} record: {display_name}.{args.domain} → {body['target']} (TTL: {body['ttl']})")
+    action = "Would create" if getattr(args, "dry_run", False) else "Creating"
+    print(f"\n  {action} {cyan(body['type'])} record: {display_name}.{args.domain} → {body['target']} (TTL: {body['ttl']})")
+    if getattr(args, "dry_run", False):
+        print(f"  {dim('Dry run — no changes applied.')}\n")
+        return
     data = api_request("POST", f"/2/zones/{args.domain}/records", token, json_data=body)
 
     record = data.get("data", {})
@@ -142,8 +164,16 @@ def cmd_dns_update(args):
         print(f"  {red('✗')} Specify at least one of --target or --ttl to update.")
         sys.exit(1)
 
-    changes = ", ".join(f"{k}={v}" for k, v in body.items())
-    print(f"\n  Updating record {args.record_id} in {args.domain}: {changes}")
+    before = _find_record(token, args.domain, args.record_id)
+    print(f"\n  {'Would update' if getattr(args, 'dry_run', False) else 'Updating'} record {args.record_id} in {args.domain}: {_describe(before)}")
+    if "target" in body:
+        print(f"    target: {before.get('target')} → {body['target']}")
+    if "ttl" in body:
+        print(f"    ttl:    {before.get('ttl')} → {body['ttl']}")
+    if getattr(args, "dry_run", False):
+        print(f"  {dim('Dry run — no changes applied.')}\n")
+        return
+
     api_request("PUT", f"/2/zones/{args.domain}/records/{args.record_id}", token, json_data=body)
     print(f"  {green('✓')} Record {bold(str(args.record_id))} updated.\n")
 
@@ -152,23 +182,31 @@ def cmd_dns_delete(args):
     """Delete a DNS record."""
     token = get_token()
 
-    if not args.yes:
-        data = api_request("GET", f"/2/zones/{args.domain}/records", token)
-        records = data.get("data", [])
-        target_rec = next((r for r in records if str(r.get("id")) == str(args.record_id)), None)
-        if target_rec:
-            source = target_rec.get("source", "@")
-            if source == ".":
-                source = "@"
-            print(f"\n  Record: {cyan(target_rec.get('type'))} {source} → {target_rec.get('target')}")
+    record = _find_record(token, args.domain, args.record_id)
+    print(f"\n  Record: {_describe(record)} (TTL: {record.get('ttl')})")
 
-        confirm = input(f"  Delete record {args.record_id} from {args.domain}? [y/N] ")
+    if getattr(args, "dry_run", False):
+        print(f"  {dim('Dry run — no changes applied.')}\n")
+        return
+
+    if not args.yes:
+        try:
+            confirm = input(f"  Delete record {args.record_id} from {args.domain}? [y/N] ")
+        except EOFError:
+            print(f"\n  {red('✗')} No terminal to confirm on. Pass --yes to delete without asking.")
+            sys.exit(1)
         if confirm.lower() not in ("y", "yes"):
             print(f"  {dim('Aborted.')}")
             return
 
     api_request("DELETE", f"/2/zones/{args.domain}/records/{args.record_id}", token)
-    print(f"  {green('✓')} Record {bold(str(args.record_id))} deleted from {args.domain}.\n")
+    print(f"  {green('✓')} Record {bold(str(args.record_id))} deleted from {args.domain}.")
+    source = record.get("source") or "@"
+    if source == ".":
+        source = "@"
+    undo = ["infomaniak", "dns", "add", args.domain, record.get("type"), source,
+            record.get("target"), "--ttl", str(record.get("ttl"))]
+    print(f"  {dim('Undo: ' + shlex.join(undo))}\n")
 
 
 def cmd_dns_export(args):

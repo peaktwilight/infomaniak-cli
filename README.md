@@ -70,6 +70,7 @@ infomaniak dns check example.com 12345                    # Check record health
 infomaniak dns add example.com A blog 93.184.216.34       # Create record
 infomaniak dns update example.com 12345 --target 1.2.3.4  # Update record
 infomaniak dns delete example.com 12345                   # Delete record
+infomaniak dns delete example.com 12345 --dry-run         # Preview; also on add and update
 infomaniak dns export example.com                         # Export as JSON
 infomaniak dns export example.com -f csv -o records.csv   # Export as CSV
 infomaniak dns import example.com records.json            # Import from file

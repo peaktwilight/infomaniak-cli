@@ -9,6 +9,7 @@ from infomaniak_cli.commands.dns import (
     cmd_dns_add,
     cmd_dns_backup,
     cmd_dns_clone,
+    cmd_dns_delete,
     cmd_dns_diff,
     cmd_dns_domains,
     cmd_dns_export,
@@ -18,6 +19,9 @@ from infomaniak_cli.commands.dns import (
     cmd_dns_sync,
     cmd_dns_update,
 )
+
+
+_RECORD = {"id": 7, "type": "A", "source": "www", "target": "1.2.3.4", "ttl": 3600}
 
 
 class TestDnsDomains:
@@ -124,11 +128,92 @@ class TestDnsAdd:
         call_kwargs = mock_req.call_args[1]
         assert call_kwargs["json"]["source"] == ""
 
+    def test_dry_run_sends_nothing(self, capsys, mock_token, mock_api, fake_args):
+        mock_req, _ = mock_api
+
+        cmd_dns_add(fake_args(domain="example.com", type="A", source="www", target="1.2.3.4",
+                              ttl=3600, dry_run=True))
+
+        mock_req.assert_not_called()
+        assert "Would create" in capsys.readouterr().out
+
 
 class TestDnsUpdate:
     def test_requires_target_or_ttl(self, fake_args, mock_token):
         with pytest.raises(SystemExit):
             cmd_dns_update(fake_args(domain="example.com", record_id="123", target=None, ttl=None))
+
+    def test_shows_before_and_after(self, capsys, mock_token, mock_api, fake_args):
+        mock_req, response = mock_api
+        response.json.side_effect = [
+            {"result": "success", "data": [_RECORD]},
+            {"result": "success", "data": True},
+        ]
+
+        cmd_dns_update(fake_args(domain="example.com", record_id="7", target="5.6.7.8", ttl=300))
+
+        out = capsys.readouterr().out
+        assert "1.2.3.4 → 5.6.7.8" in out
+        assert "3600 → 300" in out
+        assert mock_req.call_args.args[0] == "PUT"
+
+    def test_dry_run_does_not_write(self, capsys, mock_token, mock_api, fake_args):
+        mock_req, response = mock_api
+        response.json.return_value = {"result": "success", "data": [_RECORD]}
+
+        cmd_dns_update(fake_args(domain="example.com", record_id="7", target="5.6.7.8",
+                                 ttl=None, dry_run=True))
+
+        assert [c.args[0] for c in mock_req.call_args_list] == ["GET"]
+        assert "Dry run" in capsys.readouterr().out
+
+    def test_unknown_record_id_exits_before_writing(self, capsys, mock_token, mock_api, fake_args):
+        mock_req, response = mock_api
+        response.json.return_value = {"result": "success", "data": [_RECORD]}
+
+        with pytest.raises(SystemExit) as exc:
+            cmd_dns_update(fake_args(domain="example.com", record_id="999", target="5.6.7.8", ttl=None))
+
+        assert exc.value.code == 1
+        assert "not found" in capsys.readouterr().out
+        assert [c.args[0] for c in mock_req.call_args_list] == ["GET"]
+
+
+class TestDnsDelete:
+    def test_yes_deletes_and_prints_undo(self, capsys, mock_token, mock_api, fake_args):
+        mock_req, response = mock_api
+        txt = dict(_RECORD, type="TXT", source="_dmarc", target="v=DMARC1; p=none")
+        response.json.side_effect = [
+            {"result": "success", "data": [txt]},
+            {"result": "success", "data": True},
+        ]
+
+        cmd_dns_delete(fake_args(domain="example.com", record_id="7", yes=True))
+
+        assert mock_req.call_args.args[0] == "DELETE"
+        out = capsys.readouterr().out
+        assert "Undo: infomaniak dns add example.com TXT _dmarc 'v=DMARC1; p=none' --ttl 3600" in out
+
+    def test_dry_run_does_not_delete(self, capsys, mock_token, mock_api, fake_args):
+        mock_req, response = mock_api
+        response.json.return_value = {"result": "success", "data": [_RECORD]}
+
+        cmd_dns_delete(fake_args(domain="example.com", record_id="7", yes=False, dry_run=True))
+
+        assert [c.args[0] for c in mock_req.call_args_list] == ["GET"]
+        assert "Dry run" in capsys.readouterr().out
+
+    def test_no_terminal_asks_for_yes(self, capsys, monkeypatch, mock_token, mock_api, fake_args):
+        mock_req, response = mock_api
+        response.json.return_value = {"result": "success", "data": [_RECORD]}
+        monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(EOFError()))
+
+        with pytest.raises(SystemExit) as exc:
+            cmd_dns_delete(fake_args(domain="example.com", record_id="7", yes=False))
+
+        assert exc.value.code == 1
+        assert "--yes" in capsys.readouterr().out
+        assert [c.args[0] for c in mock_req.call_args_list] == ["GET"]
 
 
 class TestDnsExport:
