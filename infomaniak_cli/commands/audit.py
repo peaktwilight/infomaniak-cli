@@ -1,10 +1,14 @@
 """DNS audit — scan domains for common misconfigurations."""
 
+import json
 import sys
+from contextlib import redirect_stdout
+
+import requests
 
 from infomaniak_cli.api import api_request
 from infomaniak_cli.config import get_account_id, get_token
-from infomaniak_cli.output import bold, cyan, dim, green, output_json, red, yellow
+from infomaniak_cli.output import bold, cyan, dim, green, red, yellow
 
 
 def _has_record(records, rtype, source=None, substring=None):
@@ -60,19 +64,26 @@ def cmd_dns_audit(args):
             print(f"  {red('Domain not found:')} {domain_filter}")
             sys.exit(1)
 
+    json_mode = getattr(args, "json", False)
     all_issues = []
     all_results = []
     total_checked = 0
+    failed = 0
 
-    print(f"\n  {bold('DNS Audit')}")
-    print(f"  {dim('────────')}\n")
-    print(f"  Scanning {len(domains)} domain(s)...\n")
+    if not json_mode:
+        print(f"\n  {bold('DNS Audit')}")
+        print(f"  {dim('────────')}\n")
+        print(f"  Scanning {len(domains)} domain(s)...\n")
 
     for d in domains:
         domain_name = d.get("customer_name", "")
         try:
-            rdata = api_request("GET", f"/2/zones/{domain_name}/records", token)
-        except SystemExit:
+            # api_request prints errors to stdout; keep that out of --json output.
+            with redirect_stdout(sys.stderr):
+                rdata = api_request("GET", f"/2/zones/{domain_name}/records", token)
+        except (SystemExit, requests.RequestException):
+            failed += 1
+            all_results.append({"domain": domain_name, "issues": [], "error": "could not read records"})
             continue
 
         records = rdata.get("data", [])
@@ -139,11 +150,12 @@ def cmd_dns_audit(args):
         if domain_issues:
             all_issues.extend([(domain_name, *issue) for issue in domain_issues])
 
-    if getattr(args, "json", False):
-        output_json(all_results)
+    if json_mode:
+        print(json.dumps(all_results, indent=2, ensure_ascii=False))
+        sys.exit(1 if failed else 0)
 
     # Summary
-    clean = sum(1 for r in all_results if not r["issues"])
+    clean = sum(1 for r in all_results if not r["issues"] and "error" not in r)
     with_issues = sum(1 for r in all_results if r["issues"])
 
     if all_issues:
@@ -167,6 +179,10 @@ def cmd_dns_audit(args):
         print(f"    {green(str(clean))} clean")
     if with_issues:
         print(f"    {yellow(str(with_issues))} with issues ({len(all_issues)} total findings)")
-    if not all_issues:
+    if failed:
+        print(f"    {red(str(failed))} could not be scanned")
+    if not all_issues and not failed:
         print(f"    {green('All domains passed all checks.')}")
     print()
+    if failed:
+        sys.exit(1)
