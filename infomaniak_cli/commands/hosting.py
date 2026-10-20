@@ -10,10 +10,9 @@ def cmd_hosting_list(args):
     token = get_token()
     account_id = get_account_id(token)
 
-    products = api_request_paginated(
-        "/1/products", token,
-        params={"account_id": account_id, "service_name": "web_hosting"},
-    )
+    # The API reports web hostings as either "hosting" or "web_hosting".
+    products = api_request_paginated("/1/products", token, params={"account_id": account_id})
+    products = [p for p in products if p.get("service_name") in ("hosting", "web_hosting")]
 
     if getattr(args, "json", False):
         output_json(products)
