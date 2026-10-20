@@ -85,6 +85,10 @@ infomaniak dns propagation example.com                    # Check global DNS pro
 infomaniak dns propagation example.com -n www -t CNAME    # Check specific record
 ```
 
+`dns sync` updates changed records in place, then deletes records that are no longer
+in the file. It stops at the first failed request and is not atomic, so run it with
+`--dry-run` first and keep a `dns export` backup.
+
 ### Domains
 
 ```bash

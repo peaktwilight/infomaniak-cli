@@ -4,7 +4,10 @@ import csv
 import io
 import json
 import sys
+from collections import defaultdict
 from pathlib import Path
+
+import requests
 
 from infomaniak_cli.api import api_request
 from infomaniak_cli.config import get_account_id, get_token
@@ -286,7 +289,7 @@ def cmd_dns_import(args):
 def _normalize_record(r):
     """Normalize a record dict for comparison."""
     source = r.get("source", "@")
-    if source == ".":
+    if source in (".", ""):
         source = "@"
     return {
         "type": r.get("type", "").upper(),
@@ -597,35 +600,56 @@ def cmd_dns_sync(args):
     data = api_request("GET", f"/2/zones/{domain}/records", token)
     live_raw = data.get("data", [])
 
-    # Build lookup: key → record id for deletion
+    # Match identical records first, retaining IDs and TTLs for in-place updates.
     live_by_key = {}
     for r in live_raw:
         nr = _normalize_record(r)
         key = _record_key(nr)
-        live_by_key[key] = r.get("id")
+        live_by_key[key] = dict(nr, id=r.get("id"))
 
-    desired_keys = {_record_key(r) for r in desired}
+    desired_by_key = {_record_key(r): r for r in desired}
+    desired_keys = set(desired_by_key)
     live_keys = set(live_by_key.keys())
 
-    to_create = [r for r in desired if _record_key(r) not in live_keys]
+    to_create = [r for key, r in desired_by_key.items() if key not in live_keys]
     to_delete_keys = live_keys - desired_keys
+    to_update = [
+        (live_by_key[key], r)
+        for key, r in desired_by_key.items()
+        if key in live_keys and live_by_key[key]["ttl"] != r["ttl"]
+    ]
+    unchanged = len(desired_keys & live_keys) - len(to_update)
 
     # Don't delete NS or SOA records even if they're not in the file
     skip_types = {"NS", "SOA"}
     to_delete = []
-    for key in to_delete_keys:
+    for key in sorted(to_delete_keys):
         rtype, source, target = key
         if rtype in skip_types:
             continue
-        to_delete.append({"type": rtype, "source": source, "target": target, "id": live_by_key[key]})
+        to_delete.append(live_by_key[key])
 
-    unchanged = len(desired_keys & live_keys)
+    # A single unmatched record on each side of a name/type is a target update.
+    # Preserve its ID instead of deleting the working record before replacement.
+    creates_by_group = defaultdict(list)
+    deletes_by_group = defaultdict(list)
+    for r in to_create:
+        creates_by_group[(r["type"], r["source"])].append(r)
+    for r in to_delete:
+        deletes_by_group[(r["type"], r["source"])].append(r)
+    for group, new_records in creates_by_group.items():
+        old_records = deletes_by_group[group]
+        if len(new_records) == 1 and len(old_records) == 1:
+            before, after = old_records[0], new_records[0]
+            to_update.append((before, after))
+            to_create.remove(after)
+            to_delete.remove(before)
 
     print(f"\n  {bold(f'DNS sync plan for {domain}')}\n")
     print(f"  File: {filepath}")
-    print(f"  {green(f'+ {len(to_create)} to create')}  {red(f'- {len(to_delete)} to delete')}  {dim(f'{unchanged} unchanged')}\n")
+    print(f"  {green(f'+ {len(to_create)} to create')}  {cyan(f'~ {len(to_update)} to update')}  {red(f'- {len(to_delete)} to delete')}  {dim(f'{unchanged} unchanged')}\n")
 
-    if not to_create and not to_delete:
+    if not to_create and not to_delete and not to_update:
         print(f"  {green('✓')} Already in sync. Nothing to do.\n")
         return
 
@@ -633,6 +657,12 @@ def cmd_dns_sync(args):
         print(f"  {bold('Create:')}")
         for r in to_create:
             print(f"    {green('+')} {cyan(r['type'])}  {r['source']} → {r['target']}")
+        print()
+
+    if to_update:
+        print(f"  {bold('Update:')}")
+        for before, after in to_update:
+            print(f"    {cyan('~')} {cyan(after['type'])}  {after['source']} → {before['target']} → {after['target']} (TTL: {before['ttl']} → {after['ttl']})")
         print()
 
     if to_delete:
@@ -652,28 +682,32 @@ def cmd_dns_sync(args):
             return
         print()
 
-    # Apply deletions first
-    deleted = 0
-    for r in to_delete:
-        try:
-            api_request("DELETE", f"/2/zones/{domain}/records/{r['id']}", token)
-            print(f"  {red('-')} Deleted {r['type']} {r['source']} → {r['target']}")
-            deleted += 1
-        except SystemExit:
-            print(f"  {red('✗')} Failed to delete {r['type']} {r['source']}")
-
-    # Apply creations
-    created = 0
-    for r in to_create:
-        source = r["source"]
-        if source == "@":
-            source = ""
-        body = {"type": r["type"], "source": source, "target": r["target"], "ttl": r["ttl"]}
-        try:
+    # Create and update before deleting, and stop at the first failure.
+    created = updated = deleted = 0
+    try:
+        for r in to_create:
+            source = "" if r["source"] == "@" else r["source"]
+            body = {"type": r["type"], "source": source, "target": r["target"], "ttl": r["ttl"]}
             api_request("POST", f"/2/zones/{domain}/records", token, json_data=body)
             print(f"  {green('+')} Created {r['type']} {r['source']} → {r['target']}")
             created += 1
-        except SystemExit:
-            print(f"  {red('✗')} Failed to create {r['type']} {r['source']}")
 
-    print(f"\n  {green('✓')} Sync complete: {created} created, {deleted} deleted.\n")
+        for before, after in to_update:
+            body = {"ttl": after["ttl"]}
+            if before["target"] != after["target"]:
+                body["target"] = after["target"]
+            api_request("PUT", f"/2/zones/{domain}/records/{before['id']}", token, json_data=body)
+            print(f"  {cyan('~')} Updated {after['type']} {after['source']} → {after['target']} (TTL: {after['ttl']})")
+            updated += 1
+
+        for r in to_delete:
+            api_request("DELETE", f"/2/zones/{domain}/records/{r['id']}", token)
+            print(f"  {red('-')} Deleted {r['type']} {r['source']} → {r['target']}")
+            deleted += 1
+    except (SystemExit, requests.RequestException):
+        print(f"\n  {red('✗')} Sync incomplete: {created} created, {updated} updated, {deleted} deleted.")
+        print("  Stopped after a failed request. Earlier changes are not rolled back.")
+        print("  Check live records before retrying; the failed request may have reached the server.\n")
+        sys.exit(1)
+
+    print(f"\n  {green('✓')} Sync complete: {created} created, {updated} updated, {deleted} deleted.\n")
