@@ -1,5 +1,6 @@
 """Infomaniak API client."""
 
+import os
 import sys
 
 import requests
@@ -10,6 +11,10 @@ from infomaniak_cli.output import red
 
 def api_request(method, path, token, params=None, json_data=None):
     """Make an authenticated request to the Infomaniak API."""
+    if os.environ.get("INFOMANIAK_READ_ONLY") and method.upper() not in ("GET", "HEAD"):
+        print(f"  {red('✗')} INFOMANIAK_READ_ONLY is set: {method.upper()} {path} was not sent.")
+        sys.exit(1)
+
     url = f"{API_BASE}{path}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 

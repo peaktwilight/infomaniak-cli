@@ -58,6 +58,9 @@ export INFOMANIAK_API_TOKEN=your-token-here
 
 Token lookup order: environment variable → config file → `.env` file.
 
+Set `INFOMANIAK_READ_ONLY=1` to make every command refuse requests that would change
+anything (POST, PUT, DELETE). Useful for scripts and agents.
+
 ## Commands
 
 ### DNS

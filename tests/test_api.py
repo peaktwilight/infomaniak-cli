@@ -86,3 +86,26 @@ class TestApiRequestPaginated:
         result = api_request_paginated("/1/products", "tok")
         assert len(result) == 3
         assert [r["id"] for r in result] == [1, 2, 3]
+
+
+class TestReadOnlyMode:
+    @pytest.mark.parametrize("method", ["POST", "PUT", "DELETE"])
+    def test_blocks_writes(self, method, monkeypatch, capsys, mock_api):
+        mock_req, _ = mock_api
+        monkeypatch.setenv("INFOMANIAK_READ_ONLY", "1")
+
+        with pytest.raises(SystemExit) as exc:
+            api_request(method, "/2/zones/test.com/records", "tok", json_data={"type": "A"})
+
+        assert exc.value.code == 1
+        assert "was not sent" in capsys.readouterr().out
+        mock_req.assert_not_called()
+
+    def test_allows_reads(self, monkeypatch, mock_api):
+        mock_req, response = mock_api
+        response.json.return_value = {"result": "success", "data": []}
+        monkeypatch.setenv("INFOMANIAK_READ_ONLY", "1")
+
+        api_request("GET", "/1/products", "tok")
+
+        mock_req.assert_called_once()
