@@ -25,7 +25,9 @@ from infomaniak_cli.commands.dns import (
 from infomaniak_cli.commands.domains import cmd_domains
 from infomaniak_cli.commands.drive import cmd_drive_list
 from infomaniak_cli.commands.hosting import cmd_hosting_list
-from infomaniak_cli.commands.mail import cmd_mail_list, cmd_mail_mailboxes
+from infomaniak_cli.commands.mail import (
+    cmd_mail_aliases, cmd_mail_forwarding, cmd_mail_list, cmd_mail_mailboxes, cmd_mail_show,
+)
 from infomaniak_cli.commands.propagation import cmd_dns_propagation
 from infomaniak_cli.commands.zone import cmd_dns_zone
 from infomaniak_cli.commands.products import cmd_products
@@ -218,6 +220,17 @@ def main():
     sp.add_argument("mail_hosting_id", help="Mail hosting ID (from 'infomaniak mail list')")
     sp.add_argument("--json", action="store_true", help="Output as JSON")
     sp.set_defaults(func=cmd_mail_mailboxes)
+
+    for name, help_text, handler in (
+        ("show", "Show a mailbox (requires 'mail' scope)", cmd_mail_show),
+        ("aliases", "List a mailbox's aliases (requires 'mail' scope)", cmd_mail_aliases),
+        ("forwarding", "Show a mailbox's forwarding (requires 'mail' scope)", cmd_mail_forwarding),
+    ):
+        sp = mail_sub.add_parser(name, help=help_text)
+        sp.add_argument("mail_hosting_id", help="Mail hosting ID (from 'infomaniak mail list')")
+        sp.add_argument("mailbox_name", help="Mailbox name, the part before the @")
+        sp.add_argument("--json", action="store_true", help="Output as JSON")
+        sp.set_defaults(func=handler)
 
     # ── status ─────────────────────────────────────────────────────────────
     sp_status = subparsers.add_parser("status", help="Service status overview")

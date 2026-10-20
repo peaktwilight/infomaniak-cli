@@ -106,6 +106,9 @@ infomaniak status                                         # Service status overv
 ```bash
 infomaniak mail list                                      # List mail hostings
 infomaniak mail mailboxes <id>                            # List mailboxes (needs 'mail' scope)
+infomaniak mail show <id> <name>                          # Mailbox details
+infomaniak mail aliases <id> <name>                       # Mailbox aliases
+infomaniak mail forwarding <id> <name>                    # Mailbox forwarding settings
 ```
 
 ### Hosting & kDrive
@@ -251,6 +254,9 @@ Built on the [Infomaniak API](https://developer.infomaniak.com/docs/api):
 | `DELETE /2/zones/{zone}/records/{id}` | Delete record |
 | `GET /2/zones/{zone}/records/{id}/check` | Check record health |
 | `GET /1/mail_hostings/{id}/mailboxes` | List mailboxes |
+| `GET /1/mail_hostings/{id}/mailboxes/{name}` | Mailbox details |
+| `GET /1/mail_hostings/{id}/mailboxes/{name}/aliases` | Mailbox aliases |
+| `GET /1/mail_hostings/{id}/mailboxes/{name}/forwarding_addresses` | Mailbox forwarding |
 
 ## License
 
