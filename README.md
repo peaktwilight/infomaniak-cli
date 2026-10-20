@@ -207,7 +207,7 @@ $ infomaniak dns propagation example.com
   Quad9       9.9.9.9         93.184.216.34
   OpenDNS     208.67.222.222  93.184.216.34
 
-  All resolvers agree. DNS is fully propagated.
+  All queried resolvers agree. This does not guarantee global propagation.
 
 $ infomaniak domains
 

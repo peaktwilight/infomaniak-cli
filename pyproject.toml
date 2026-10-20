@@ -32,6 +32,7 @@ classifiers = [
 ]
 dependencies = [
     "requests>=2.32.4",
+    "dnspython>=2.6.1",
 ]
 
 [project.urls]
