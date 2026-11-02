@@ -3,6 +3,7 @@
 import configparser
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 from infomaniak_cli.api import api_request
@@ -28,9 +29,19 @@ def save_config(token, account_id=None):
     if account_id:
         config["default"]["account_id"] = str(account_id)
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    with open(CONFIG_FILE, "w") as f:
-        config.write(f)
-    CONFIG_FILE.chmod(0o600)
+    # Create a private file in the destination directory, then atomically
+    # replace the config so the token is never written with umask-derived
+    # permissions and an existing config remains intact on write failure.
+    fd, temp_path = tempfile.mkstemp(prefix=".config.ini.", dir=CONFIG_DIR)
+    try:
+        with os.fdopen(fd, "w") as f:
+            config.write(f)
+        os.replace(temp_path, CONFIG_FILE)
+    finally:
+        try:
+            os.unlink(temp_path)
+        except FileNotFoundError:
+            pass
 
 
 def load_env_file():
