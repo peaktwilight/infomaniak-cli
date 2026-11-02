@@ -48,7 +48,7 @@ def print_table(headers, rows):
     print(f"  {separator}")
 
     for row in rows:
-        line = "  ".join(_ljust(str(cell), col_widths[i]) for i, cell in enumerate(row))
+        line = "  ".join(_ljust(re.sub(r"[\x00-\x1f\x7f]", lambda m: f"\\x{ord(m.group()):02x}", str(cell)), col_widths[i]) for i, cell in enumerate(row))
         print(f"  {line}")
 
 
