@@ -554,8 +554,6 @@ def cmd_dns_backup(args):
         if fmt == "csv":
             output = io.StringIO()
             writer = csv.DictWriter(output, fieldnames=["type", "source", "target", "ttl"])
-            writer.writeheader()
-            writer.writerows(export_data)
             content = output.getvalue()
             ext = "csv"
         else:
