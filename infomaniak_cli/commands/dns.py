@@ -11,6 +11,40 @@ from infomaniak_cli.config import get_account_id, get_token
 from infomaniak_cli.output import bold, cyan, dim, green, output_json, print_table, red, yellow
 
 
+_CSV_ESCAPE_COLUMN = "__infomaniak_cli_csv_safety"
+_CSV_ESCAPE_VERSION = "infomaniak-cli-v1"
+
+
+def _write_dns_csv(output, records):
+    """Write spreadsheet-safe DNS CSV while retaining reversible CLI exports."""
+    fieldnames = ["type", "source", "target", "ttl", _CSV_ESCAPE_COLUMN]
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    for record in records:
+        row = dict(record)
+        for field, value in row.items():
+            if not isinstance(value, str):
+                continue
+            if value.startswith("~"):
+                row[field] = "~S" + value
+            elif value.lstrip().startswith(("=", "+", "-", "@")):
+                row[field] = "~F" + value
+        row[_CSV_ESCAPE_COLUMN] = _CSV_ESCAPE_VERSION
+        writer.writerow(row)
+
+
+def _read_dns_csv(reader):
+    """Restore fields only in CSVs encoded by _write_dns_csv."""
+    records = list(reader)
+    for record in records:
+        if record.pop(_CSV_ESCAPE_COLUMN, None) != _CSV_ESCAPE_VERSION:
+            continue
+        for field, value in record.items():
+            if isinstance(value, str) and value.startswith(("~F", "~S")):
+                record[field] = value[2:]
+    return records
+
+
 def cmd_dns_domains(args):
     """List all domains on the account."""
     token = get_token()
@@ -197,9 +231,7 @@ def cmd_dns_export(args):
 
     if args.format == "csv":
         output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=["type", "source", "target", "ttl"])
-        writer.writeheader()
-        writer.writerows(export_data)
+        _write_dns_csv(output, export_data)
         content = output.getvalue()
     else:
         content = json.dumps(export_data, indent=2, ensure_ascii=False)
@@ -227,7 +259,7 @@ def cmd_dns_import(args):
     # Detect format
     if filepath.suffix == ".csv":
         reader = csv.DictReader(io.StringIO(content))
-        records = list(reader)
+        records = _read_dns_csv(reader)
     else:
         try:
             records = json.loads(content)
@@ -315,7 +347,7 @@ def cmd_dns_diff(args):
     content = filepath.read_text()
     if filepath.suffix == ".csv":
         reader = csv.DictReader(io.StringIO(content))
-        file_records = [_normalize_record(r) for r in reader]
+        file_records = [_normalize_record(r) for r in _read_dns_csv(reader)]
     else:
         try:
             raw = json.loads(content)
@@ -553,9 +585,7 @@ def cmd_dns_backup(args):
 
         if fmt == "csv":
             output = io.StringIO()
-            writer = csv.DictWriter(output, fieldnames=["type", "source", "target", "ttl"])
-            writer.writeheader()
-            writer.writerows(export_data)
+            _write_dns_csv(output, export_data)
             content = output.getvalue()
             ext = "csv"
         else:
@@ -584,7 +614,7 @@ def cmd_dns_sync(args):
     content = filepath.read_text()
     if filepath.suffix == ".csv":
         reader = csv.DictReader(io.StringIO(content))
-        desired = [_normalize_record(r) for r in reader]
+        desired = [_normalize_record(r) for r in _read_dns_csv(reader)]
     else:
         try:
             raw = json.loads(content)
