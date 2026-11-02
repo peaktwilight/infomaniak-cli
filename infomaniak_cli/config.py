@@ -44,7 +44,7 @@ def load_env_file():
                         key, _, value = line.partition("=")
                         key = key.strip()
                         value = value.strip().strip("'\"")
-                        if key and key not in os.environ:
+                        if key in {"INFOMANIAK_API_TOKEN", "INFOMANIAK_ACCOUNT_ID"} and key not in os.environ:
                             os.environ[key] = value
 
 
