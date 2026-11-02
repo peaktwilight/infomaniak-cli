@@ -21,6 +21,14 @@ def cyan(t):   return _c("36", t)
 def dim(t):    return _c("2", t)
 
 
+def _safe_terminal_text(value):
+    """Render control characters visibly instead of sending them to the terminal."""
+    return "".join(
+        f"\\x{ord(char):02x}" if ord(char) < 32 or 0x7f <= ord(char) <= 0x9f else char
+        for char in str(value)
+    )
+
+
 def _visible_len(s):
     """Length of string excluding ANSI escape codes."""
     return len(_ANSI_RE.sub("", str(s)))
@@ -36,6 +44,8 @@ def print_table(headers, rows):
     if not rows:
         print(f"  {dim('(no results)')}")
         return
+
+    rows = [[_safe_terminal_text(cell) for cell in row] for row in rows]
 
     col_widths = [_visible_len(h) for h in headers]
     for row in rows:
