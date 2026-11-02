@@ -2,6 +2,7 @@
 
 import io
 import sys
+import getpass
 import webbrowser
 
 from infomaniak_cli.api import api_request
@@ -46,7 +47,9 @@ def cmd_setup(args):
     else:
         print(f"  {dim(f'Go to: {url}')}\n")
 
-    token = input("  Paste your API token: ").strip()
+    token_prompt = "  Paste your API token: "
+    token_reader = getpass.getpass if sys.stdin.isatty() else input
+    token = token_reader(token_prompt).strip()
     if not token:
         print(f"\n  {red('✗')} No token provided.")
         sys.exit(1)
