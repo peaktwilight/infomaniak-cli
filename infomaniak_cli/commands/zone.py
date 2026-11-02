@@ -5,6 +5,11 @@ from infomaniak_cli.config import get_token
 from infomaniak_cli.output import bold, dim, green
 
 
+def _zone_field(value):
+    """Escape line breaks so record data cannot add zone-file directives."""
+    return str(value).replace("\r", r"\013").replace("\n", r"\010")
+
+
 def cmd_dns_zone(args):
     """Generate a BIND-format zone file for a domain."""
     token = get_token()
@@ -50,7 +55,7 @@ def cmd_dns_zone(args):
             if not target.startswith('"'):
                 target = f'"{target}"'
 
-        line = f"{name:<24} {ttl:<8} IN  {rtype:<8} {target}"
+        line = f"{_zone_field(name):<24} {_zone_field(ttl):<8} IN  {_zone_field(rtype):<8} {_zone_field(target)}"
         lines.append(line)
 
     zone_content = "\n".join(lines) + "\n"
