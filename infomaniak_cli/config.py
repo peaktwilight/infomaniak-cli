@@ -28,9 +28,16 @@ def save_config(token, account_id=None):
     if account_id:
         config["default"]["account_id"] = str(account_id)
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    with open(CONFIG_FILE, "w") as f:
-        config.write(f)
-    CONFIG_FILE.chmod(0o600)
+    fd = os.open(CONFIG_FILE, os.O_WRONLY | os.O_CREAT, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        os.ftruncate(fd, 0)
+        with os.fdopen(fd, "w") as f:
+            fd = None
+            config.write(f)
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 def load_env_file():
